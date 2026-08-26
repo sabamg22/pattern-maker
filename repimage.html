@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatial Dot Annotator - Retro Fun Edition</title>
+    <style>
+        /* Classic Windows 95 Color Palette */
+        :root {
+            --win-bg: #c0c0c0;
+            --win-border-light: #dfdfdf;
+            --win-border-white: #ffffff;
+            --win-border-dark: #808080;
+            --win-border-black: #0a0a0a;
+            --win-title-bg: #000080;
+            --win-title-text: #ffffff;
+            --desktop-bg: #008080;
+        }
+
+        body { 
+            font-family: 'MS Sans Serif', Tahoma, Arial, sans-serif; 
+            display: flex; 
+            margin: 0; 
+            height: 100vh; 
+            background: var(--desktop-bg); 
+            color: #000;
+        }
+
+        #sidebar { 
+            width: 380px; 
+            background: var(--win-bg); 
+            border: 2px solid;
+            border-color: var(--win-border-light) var(--win-border-black) var(--win-border-black) var(--win-border-light);
+            box-shadow: inset 1px 1px var(--win-border-white), inset -1px -1px var(--win-border-dark);
+            display: flex;
+            flex-direction: column;
+            margin: 10px;
+            max-height: calc(100vh - 20px);
+        }
+
+        .win-titlebar {
+            background: var(--win-title-bg);
+            color: var(--win-title-text);
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .win-content {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        #main { 
+            flex-grow: 1; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: auto; 
+            padding: 20px; 
+        }
+
+        canvas { 
+            background: #fff; 
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5); 
+            cursor: crosshair; 
+        }
+
+        fieldset {
+            border: 2px solid;
+            border-color: var(--win-border-light) var(--win-border-white) var(--win-border-white) var(--win-border-light);
+            box-shadow: inset 1px 1px var(--win-border-dark), inset -1px -1px var(--win-border-light);
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        legend {
+            padding: 0 5px;
+            background: var(--win-bg);
+            font-size: 13px;
+        }
+
+        label { display: block; margin-bottom: 5px; font-size: 13px; }
+        
+        input[type="range"] { width: 100%; margin-bottom: 5px; }
+        
+        select, input[type="text"] { 
+            width: 100%; 
+            padding: 4px; 
+            font-size: 13px; 
+            margin-bottom: 5px; 
+            background: #fff;
+            border: 2px solid;
+            border-color: var(--win-border-dark) var(--win-border-white) var(--win-border-white) var(--win-border-dark);
+            box-sizing: border-box;
+        }
+
+        button { 
+            padding: 4px 10px; 
+            background: var(--win-bg); 
+            color: #000; 
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer; 
+            margin-top: 5px; 
+            border: 2px solid;
+            border-color: var(--win-border-white) var(--win-border-black) var(--win-border-black) var(--win-border-white);
+            box-shadow: inset 1px 1px var(--win-border-light), inset -1px -1px var(--win-border-dark);
+        }
+
+        button:active { 
+            border-color: var(--win-border-black) var(--win-border-white) var(--win-border-white) var(--win-border-black);
+            box-shadow: inset 1px 1px var(--win-border-dark), inset -1px -1px var(--win-border-light);
+            padding: 5px 9px 3px 11px;
+        }
+        
+        .upload-row { display: flex; gap: 5px; align-items: center; margin-bottom: 10px; }
+        .upload-row input[type="file"] { flex-grow: 1; font-size: 12px; }
+
+        .section-item, .subsection-item { 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 4px; background: #fff; margin-bottom: 2px; 
+            border: 1px solid var(--win-border-dark); cursor: pointer; 
+        }
+        .subsection-item { background: #f0f0f0; padding-left: 20px; }
+        .active-node { background: var(--win-title-bg) !important; color: white; }
+        .active-node input[type="text"] { color: #000; }
+        
+        .name-input { flex-grow: 1; margin: 0 5px; font-size: 12px; }
+        .color-input { border: 1px solid var(--win-border-dark); padding: 0; width: 20px; height: 20px; cursor: pointer; background: none; }
+        
+        .shortcut-hint { font-size: 11px; color: #333; display: block; margin-top: 3px; }
+        .radio-group { display: flex; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="win-titlebar">
+            <span>Spatial Annotator 98</span>
+            <span style="background:#c0c0c0; color:#000; padding: 0 4px; border:1px solid #fff; border-right-color:#000; border-bottom-color:#000; cursor:pointer;">X</span>
+        </div>
+        
+        <div class="win-content">
+            <fieldset>
+                <legend>1. Upload Images</legend>
+                <label style="font-weight: normal; font-size: 12px;">Base Image:</label>
+                <div class="upload-row">
+                    <input type="file" id="imageLoader" accept="image/*">
+                    <button id="removeBaseImgBtn" style="margin:0; width:auto;">Remove</button>
+                </div>
+                
+                <label style="font-weight: normal; font-size: 12px;">Overlay Mask (Optional):</label>
+                <div class="upload-row">
+                    <input type="file" id="overlayLoader" accept="image/*">
+                    <button id="removeOverlayBtn" style="margin:0; width:auto;">Remove</button>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>2. Grid & Layers</legend>
+                
+                <label style="font-weight: normal; font-size: 12px;">Grid Shape:</label>
+                <select id="gridShapeType" style="margin-bottom: 10px;">
+                    <option value="dot">⚫ Dots</option>
+                    <option value="heart">❤️ Hearts</option>
+                    <option value="star">⭐ Stars</option>
+                </select>
+
+                <label style="font-weight: normal; font-size: 12px;">Grid Spacing: <span id="spacingVal">15</span>px</label>
+                <input type="range" id="spacing" min="5" max="50" value="15">
+                
+                <label style="font-weight: normal; font-size: 12px; margin-top: 10px;">Shape Size: <span id="radiusVal">5</span>px</label>
+                <input type="range" id="radius" min="2" max="25" value="5">
+
+                <label style="font-weight: normal; font-size: 12px; margin-top: 10px;">Shape Opacity: <span id="opacityVal">0.85</span></label>
+                <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.85">
+
+                <div style="border: 1px dotted var(--win-border-dark); padding: 5px; margin-top: 10px;">
+                    <label style="font-weight: normal; font-size: 12px;">
+                        <input type="checkbox" id="showOverlay" checked> Show Uploaded Mask
+                    </label>
+                    <label style="font-weight: normal; font-size: 12px; margin-top: 5px;">Mask Visibility: <span id="overlayOpacityVal">0.5</span></label>
+                    <input type="range" id="overlayOpacity" min="0.1" max="1" step="0.05" value="0.5">
+                </div>
+
+                <div class="radio-group" style="margin-top: 15px;">
+                    <span>Color By:</span>
+                    <label style="font-weight: normal;"><input type="radio" name="colorMode" value="section" checked> Section</label>
+                    <label style="font-weight: normal;"><input type="radio" name="colorMode" value="subsection"> Sub</label>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>3. Drawing Tools</legend>
+                
+                <select id="toolType" style="margin-bottom: 10px;">
+                    <option value="polygon">✒️ Polygon (Click points)</option>
+                    <option value="rectangle">🟦 Rectangle (Click & drag)</option>
+                    <option value="lasso">➰ Lasso (Freehand draw)</option>
+                    <option value="paint">🖌️ Paint Brush</option>
+                    <option value="wand">🪄 Magic Wand (Auto-select)</option>
+                </select>
+
+                <div id="brushSizeWrapper" style="display: none; margin-bottom: 10px;">
+                    <label style="font-weight: normal; font-size: 12px;">Brush Size: <span id="brushSizeVal">20</span>px</label>
+                    <input type="range" id="brushSize" min="5" max="100" value="20">
+                </div>
+
+                <div id="wandControls" style="display: none; margin-bottom: 10px;">
+                    <label style="font-weight: normal; font-size: 12px;">Color Tolerance: <span id="wandTolVal">20</span></label>
+                    <input type="range" id="wandTolerance" min="0" max="150" value="20">
+                </div>
+
+                <select id="drawMode">
+                    <option value="new_section">🟢 Create New Section</option>
+                    <option value="new_subsection">🟡 Create New Subsection</option>
+                    <option value="add">🔵 Add to Active Shape</option>
+                    <option value="subtract">🔴 Remove from Active Shape</option>
+                    <option value="hide">👻 Hide / Erase Region (Global)</option>
+                </select>
+                
+                <div id="newSectionColorWrapper" style="display: flex; align-items: center; margin-bottom: 10px; margin-top: 10px;">
+                    <label style="margin: 0 10px 0 0; font-size: 13px;">Shape Color:</label>
+                    <input type="color" id="sectionColor" value="#ff0000" class="color-input">
+                </div>
+
+                <div id="polygonControls">
+                    <button id="finishPolygonBtn" style="width: 100%;">Finish Shape</button>
+                    <span class="shortcut-hint">Shortcut: Press <strong>Enter</strong> to finish</span>
+                    <span class="shortcut-hint">Shortcut: Press <strong>Backspace</strong> to pop last dot</span>
+                    <button id="cancelPolygonBtn" style="width: 100%; margin-top: 10px;">Clear Current Drawing</button>
+                </div>
+                
+                <p id="toolHint" style="font-size: 11px; margin-top: 10px;">Click image to place points. Click your first dot to close and save.</p>
+            </fieldset>
+
+            <fieldset>
+                <legend>Manage Sections</legend>
+                <p style="font-size: 11px; margin-top:0;">Click a row to set it as Active.</p>
+                <div id="sectionList" style="max-height: 150px; overflow-y: auto; border: 2px solid; border-color: var(--win-border-dark) var(--win-border-white) var(--win-border-white) var(--win-border-dark); background: #fff; padding: 2px;"></div>
+                
+                <div style="display: flex; gap: 5px; margin-top: 10px;">
+                    <button id="clearSectionsBtn" style="flex-grow: 1; margin: 0;">Clear Sections</button>
+                    <button id="clearHiddenBtn" style="flex-grow: 1; margin: 0;">Clear Hidden</button>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>4. Export</legend>
+                <select id="exportType" style="margin-bottom: 10px;">
+                    <option value="full">Full Base Image + Dots</option>
+                    <option value="cropped">Cropped Image + Dots</option>
+                    <option value="mask_color_trans">Mask (Color, Transparent)</option>
+                    <option value="mask_color_white">Mask (Color, White BG)</option>
+                    <option value="mask_grey_trans">Mask (Greyscale, Transparent)</option>
+                    <option value="mask_grey_white">Mask (Greyscale, White BG)</option>
+                </select>
+
+                <div style="display: flex; gap: 5px;">
+                    <button id="exportPngBtn" style="flex-grow: 1;">Export PNG</button>
+                    <button id="exportSvgBtn" style="flex-grow: 1;">Export SVG</button>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div id="main">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let img = new Image();
+        let overlayImg = new Image();
+        let imgLoaded = false;
+        let overlayImgLoaded = false;
+        let originalImgDataUrl = null;
+        let overlayImgDataUrl = null; 
+        
+        // Data Structures
+        let sections = [];        
+        let hiddenPolygons = [];     
+        let hiddenCircles = [];
+        let hiddenWandDots = new Set(); 
+
+        let currentPolygon = [];
+        let isDrawingAction = false;
+        let rectStartPoint = null; 
+        let lastPaintPoint = null;
+
+        let idCounter = 1;
+        let activeNodeId = null; 
+
+        // UI Listeners
+        const gridShapeSelect = document.getElementById('gridShapeType');
+        const spacingSlider = document.getElementById('spacing');
+        const radiusSlider = document.getElementById('radius');
+        const opacitySlider = document.getElementById('opacity');
+        const brushSizeSlider = document.getElementById('brushSize');
+        const wandTolSlider = document.getElementById('wandTolerance');
+        const sectionColorInput = document.getElementById('sectionColor');
+        const drawModeSelect = document.getElementById('drawMode');
+        const toolTypeSelect = document.getElementById('toolType');
+        const colorModeRadios = document.getElementsByName('colorMode');
+        
+        function getRandomColor() { return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'); }
+        function getColorMode() { return document.querySelector('input[name="colorMode"]:checked').value; }
+        
+        gridShapeSelect.addEventListener('change', () => draw());
+        colorModeRadios.forEach(radio => radio.addEventListener('change', () => draw()));
+
+        toolTypeSelect.addEventListener('change', function(e) {
+            const tool = e.target.value;
+            const polyControls = document.getElementById('polygonControls');
+            const brushSizeWrap = document.getElementById('brushSizeWrapper');
+            const wandControls = document.getElementById('wandControls');
+            const hint = document.getElementById('toolHint');
+            
+            polyControls.style.display = 'none'; brushSizeWrap.style.display = 'none'; wandControls.style.display = 'none';
+            
+            if (tool === 'polygon') {
+                polyControls.style.display = 'block';
+                hint.innerText = "Click image to place points. Click your first dot to close and save.";
+            } else if (tool === 'rectangle') {
+                hint.innerText = "Click and drag to draw a box. Release to apply.";
+            } else if (tool === 'lasso') {
+                hint.innerText = "Click and hold to draw a freehand shape. Release to apply.";
+            } else if (tool === 'paint') {
+                brushSizeWrap.style.display = 'block';
+                hint.innerText = "Click and drag to paint over dots. Release to stop.";
+            } else if (tool === 'wand') {
+                wandControls.style.display = 'block';
+                hint.innerText = "Click a color region on the image to automatically select matching dots.";
+            }
+            currentPolygon = []; draw();
+        });
+
+        drawModeSelect.addEventListener('change', function(e) {
+            const mode = e.target.value;
+            document.getElementById('newSectionColorWrapper').style.display = (mode === 'new_section' || mode === 'new_subsection') ? 'flex' : 'none';
+            draw();
+        });
+
+        document.getElementById('showOverlay').addEventListener('change', draw);
+        document.getElementById('overlayOpacity').addEventListener('input', (e) => { document.getElementById('overlayOpacityVal').innerText = e.target.value; draw(); });
+
+        brushSizeSlider.addEventListener('input', (e) => document.getElementById('brushSizeVal').innerText = e.target.value);
+        wandTolSlider.addEventListener('input', (e) => document.getElementById('wandTolVal').innerText = e.target.value);
+        spacingSlider.addEventListener('input', (e) => { document.getElementById('spacingVal').innerText = e.target.value; draw(); });
+        radiusSlider.addEventListener('input', (e) => { document.getElementById('radiusVal').innerText = e.target.value; draw(); });
+        opacitySlider.addEventListener('input', (e) => { document.getElementById('opacityVal').innerText = e.target.value; draw(); });
+
+        document.getElementById('removeBaseImgBtn').addEventListener('click', () => {
+            img = new Image(); imgLoaded = false; originalImgDataUrl = null;
+            document.getElementById('imageLoader').value = '';
+            ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.width = 0; canvas.height = 0; draw();
+        });
+
+        document.getElementById('removeOverlayBtn').addEventListener('click', () => {
+            overlayImg = new Image(); overlayImgLoaded = false; overlayImgDataUrl = null;
+            document.getElementById('overlayLoader').value = ''; draw();
+        });
+
+        document.getElementById('imageLoader').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                img.onload = function() {
+                    canvas.width = img.width; canvas.height = img.height; imgLoaded = true;
+                    originalImgDataUrl = event.target.result; draw();
+                }
+                img.src = event.target.result;
+            }
+            if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+        });
+
+        document.getElementById('overlayLoader').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                overlayImg.onload = function() { overlayImgLoaded = true; draw(); }
+                overlayImgDataUrl = event.target.result;
+                overlayImg.src = event.target.result;
+            }
+            if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+        });
+
+        function getActiveNodeData() {
+            if (!activeNodeId) return null;
+            for (let i = 0; i < sections.length; i++) {
+                if (sections[i].id === activeNodeId) return { type: 'section', ref: sections[i] };
+                for (let j = 0; j < sections[i].subsections.length; j++) {
+                    if (sections[i].subsections[j].id === activeNodeId) return { type: 'subsection', ref: sections[i].subsections[j], parent: sections[i] };
+                }
+            }
+            return null;
+        }
+
+        function createNewSectionNode() {
+            const newId = Date.now();
+            sections.push({
+                id: newId, name: 'Section ' + idCounter++, color: sectionColorInput.value,
+                polygons: [], exclusions: [], circles: [], excludedCircles: [], 
+                assignedDots: new Set(), excludedAssignedDots: new Set(), subsections: []
+            });
+            activeNodeId = newId; sectionColorInput.value = getRandomColor();
+            updateSectionList();
+        }
+
+        function createNewSubsectionNode() {
+            const activeData = getActiveNodeData();
+            if (!activeData || activeData.type !== 'section') { alert("Please select a base Section to add a subsection to."); return false; }
+            const newId = Date.now();
+            activeData.ref.subsections.push({
+                id: newId, name: 'Sub ' + (activeData.ref.subsections.length + 1), color: sectionColorInput.value,
+                polygons: [], exclusions: [], circles: [], excludedCircles: [], assignedDots: new Set(), excludedAssignedDots: new Set()
+            });
+            activeNodeId = newId; sectionColorInput.value = getRandomColor();
+            updateSectionList();
+            return true;
+        }
+
+        canvas.addEventListener('mousedown', function(e) {
+            if (!imgLoaded) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const tool = toolTypeSelect.value, mode = drawModeSelect.value;
+
+            if (tool === 'polygon') {
+                if (currentPolygon.length > 2) {
+                    const dist = Math.hypot(currentPolygon[0][0] - x, currentPolygon[0][1] - y);
+                    if (dist <= 15) { finishPolygonShape(); return; }
+                }
+                currentPolygon.push([x, y]); draw();
+            } 
+            else if (tool === 'lasso') {
+                isDrawingAction = true; currentPolygon = [[x, y]];
+            }
+            else if (tool === 'rectangle') {
+                isDrawingAction = true; 
+                rectStartPoint = {x, y};
+                currentPolygon = [[x, y], [x, y], [x, y], [x, y]]; 
+            } 
+            else if (tool === 'paint') {
+                if (mode === 'add' || mode === 'subtract') { if (!getActiveNodeData()) { alert("Select a section to edit."); return; } } 
+                else if (mode === 'new_section') createNewSectionNode();
+                else if (mode === 'new_subsection') { if (!createNewSubsectionNode()) return; }
+                isDrawingAction = true; handlePaintStroke(x, y, true);
+            }
+            else if (tool === 'wand') {
+                executeMagicWand(x, y);
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!isDrawingAction || !imgLoaded) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const tool = toolTypeSelect.value;
+
+            if (tool === 'lasso') { 
+                currentPolygon.push([x, y]); draw(); 
+            } 
+            else if (tool === 'rectangle') {
+                let minX = Math.min(rectStartPoint.x, x);
+                let maxX = Math.max(rectStartPoint.x, x);
+                let minY = Math.min(rectStartPoint.y, y);
+                let maxY = Math.max(rectStartPoint.y, y);
+                currentPolygon = [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]];
+                draw();
+            }
+            else if (tool === 'paint') { 
+                handlePaintStroke(x, y); draw(); 
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            if (!isDrawingAction) return;
+            isDrawingAction = false;
+            if (toolTypeSelect.value === 'lasso' || toolTypeSelect.value === 'rectangle') finishPolygonShape();
+            else if (toolTypeSelect.value === 'paint') lastPaintPoint = null;
+        });
+
+        function executeMagicWand(x, y) {
+            const mode = drawModeSelect.value;
+            let activeData = null;
+            
+            if (mode === 'add' || mode === 'subtract') {
+                activeData = getActiveNodeData();
+                if (!activeData) return alert("Select a section/subsection to edit.");
+            } else if (mode === 'new_section') {
+                createNewSectionNode(); activeData = getActiveNodeData();
+            } else if (mode === 'new_subsection') {
+                if (!createNewSubsectionNode()) return; activeData = getActiveNodeData();
+            }
+
+            const tempCnv = document.createElement('canvas');
+            tempCnv.width = canvas.width; tempCnv.height = canvas.height;
+            const tCtx = tempCnv.getContext('2d');
+            tCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            if (overlayImgLoaded && document.getElementById('showOverlay').checked) {
+                tCtx.globalAlpha = parseFloat(document.getElementById('overlayOpacity').value);
+                tCtx.drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
+                tCtx.globalAlpha = 1.0;
+            }
+            
+            const imgData = tCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const px = Math.floor(x), py = Math.floor(y);
+            const targetIdx = (py * canvas.width + px) * 4;
+            const tr = imgData[targetIdx], tg = imgData[targetIdx+1], tb = imgData[targetIdx+2], ta = imgData[targetIdx+3];
+
+            if (ta < 10) return;
+
+            const tol = parseInt(wandTolSlider.value) * 3; 
+            const spacing = parseFloat(spacingSlider.value);
+
+            for (let dy = 0; dy < canvas.height + spacing; dy += spacing * 0.866) {
+                let rowIsOdd = Math.round(dy / (spacing * 0.866)) % 2 !== 0;
+                let xOffset = rowIsOdd ? spacing / 2 : 0;
+                for (let dx = xOffset; dx < canvas.width + spacing; dx += spacing) {
+                    let cpx = Math.floor(dx), cpy = Math.floor(dy);
+                    if (cpx < 0 || cpx >= canvas.width || cpy < 0 || cpy >= canvas.height) continue;
+                    
+                    let idx = (cpy * canvas.width + cpx) * 4;
+                    let r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2], a = imgData[idx+3];
+
+                    if (a > 10) {
+                        let diff = Math.abs(r - tr) + Math.abs(g - tg) + Math.abs(b - tb);
+                        if (diff <= tol) {
+                            let dotKey = Math.round(dx) + '_' + Math.round(dy);
+                            if (mode === 'hide') hiddenWandDots.add(dotKey);
+                            else {
+                                if (mode === 'subtract') activeData.ref.excludedAssignedDots.add(dotKey);
+                                else activeData.ref.assignedDots.add(dotKey);
+                            }
+                        }
+                    }
+                }
+            }
+            draw();
+        }
+
+        function handlePaintStroke(x, y, force = false) {
+            const size = parseInt(brushSizeSlider.value);
+            if (!force && lastPaintPoint && Math.hypot(x - lastPaintPoint.x, y - lastPaintPoint.y) < size / 4) return; 
+            
+            lastPaintPoint = {x, y};
+            const circle = {x, y, r: size}, mode = drawModeSelect.value;
+
+            if (mode === 'hide') hiddenCircles.push(circle);
+            else {
+                const activeData = getActiveNodeData();
+                if (!activeData) return;
+                if (mode === 'subtract') activeData.ref.excludedCircles.push(circle);
+                else activeData.ref.circles.push(circle);
+            }
+        }
+
+        function finishPolygonShape() {
+            if (currentPolygon.length < 3) { currentPolygon = []; draw(); return; }
+            const mode = drawModeSelect.value;
+            
+            if (mode === 'new_section') { createNewSectionNode(); getActiveNodeData().ref.polygons.push([...currentPolygon]); } 
+            else if (mode === 'new_subsection') { if(createNewSubsectionNode()) getActiveNodeData().ref.polygons.push([...currentPolygon]); } 
+            else if (mode === 'hide') hiddenPolygons.push([...currentPolygon]);
+            else { 
+                const activeData = getActiveNodeData();
+                if (!activeData) { alert("Please select a shape to edit."); currentPolygon = []; draw(); return; }
+                if (mode === 'add') activeData.ref.polygons.push([...currentPolygon]);
+                if (mode === 'subtract') activeData.ref.exclusions.push([...currentPolygon]);
+            }
+            currentPolygon = []; updateSectionList(); draw();
+        }
+
+        document.getElementById('finishPolygonBtn').addEventListener('click', finishPolygonShape);
+        document.getElementById('cancelPolygonBtn').addEventListener('click', () => { currentPolygon = []; draw(); });
+        document.getElementById('clearSectionsBtn').addEventListener('click', () => { sections = []; activeNodeId = null; idCounter = 1; updateSectionList(); draw(); });
+        document.getElementById('clearHiddenBtn').addEventListener('click', () => { hiddenPolygons = []; hiddenCircles = []; hiddenWandDots = new Set(); draw(); });
+
+        document.addEventListener('keydown', function(e) {
+            if (toolTypeSelect.value !== 'polygon') return; 
+            if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+            if (e.key === 'Enter') finishPolygonShape();
+            else if (e.key === 'Backspace' && currentPolygon.length > 0) { currentPolygon.pop(); draw(); }
+        });
+
+        function createListItem(node, type, parentIndex, childIndex) {
+            const div = document.createElement('div');
+            div.className = type === 'section' ? 'section-item' : 'subsection-item';
+            if (node.id === activeNodeId) div.classList.add('active-node');
+
+            div.onclick = (e) => {
+                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                    activeNodeId = node.id; updateSectionList(); draw();
+                }
+            };
+            
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color'; colorInput.className = 'color-input'; colorInput.value = node.color;
+            colorInput.addEventListener('input', (e) => { node.color = e.target.value; draw(); });
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text'; nameInput.className = 'name-input'; nameInput.value = node.name;
+            nameInput.addEventListener('input', (e) => { node.name = e.target.value; });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = 'X'; 
+            deleteBtn.style.cssText = 'width:auto; padding:0 4px; margin:0;';
+            deleteBtn.onclick = () => {
+                if (type === 'section') sections.splice(parentIndex, 1);
+                else sections[parentIndex].subsections.splice(childIndex, 1);
+                if (node.id === activeNodeId) activeNodeId = null;
+                updateSectionList(); draw();
+            };
+
+            div.append(colorInput, nameInput, deleteBtn); return div;
+        }
+
+        function updateSectionList() {
+            const list = document.getElementById('sectionList'); list.innerHTML = '';
+            sections.forEach((sec, i) => {
+                list.appendChild(createListItem(sec, 'section', i, null));
+                if (sec.subsections.length > 0) {
+                    const subContainer = document.createElement('div'); subContainer.className = 'subsection-container';
+                    sec.subsections.forEach((sub, j) => subContainer.appendChild(createListItem(sub, 'subsection', i, j)));
+                    list.appendChild(subContainer);
+                }
+            });
+        }
+
+        function isPointInPolygon(point, vs) {
+            let x = point[0], y = point[1], inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1], xj = vs[j][0], yj = vs[j][1];
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function checkShapeContains(x, y, dotKey, polyArray, exclPolyArray, circArray, exclCircArray, assignedDots, exclAssignedDots) {
+            if (exclAssignedDots && exclAssignedDots.has(dotKey)) return false;
+            for (let e = 0; e < exclPolyArray.length; e++) if (isPointInPolygon([x, y], exclPolyArray[e])) return false;
+            for (let e = 0; e < exclCircArray.length; e++) if (Math.hypot(x - exclCircArray[e].x, y - exclCircArray[e].y) <= exclCircArray[e].r) return false;
+            
+            if (assignedDots && assignedDots.has(dotKey)) return true;
+            for (let p = 0; p < polyArray.length; p++) if (isPointInPolygon([x, y], polyArray[p])) return true;
+            for (let c = 0; c < circArray.length; c++) if (Math.hypot(x - circArray[c].x, y - circArray[c].y) <= circArray[c].r) return true;
+            
+            return false;
+        }
+
+        function hexToGreyscaleHex(hex) {
+            let r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+            let gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b).toString(16).padStart(2, '0');
+            return `#${gray}${gray}${gray}`;
+        }
+        function hexToRgba(hex, alpha) {
+            let r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function getDotColor(x, y, colorMode, styleFormat = 'color') {
+            let dotKey = Math.round(x) + '_' + Math.round(y);
+            
+            if (hiddenWandDots.has(dotKey)) return null;
+            for (let h = 0; h < hiddenPolygons.length; h++) if (isPointInPolygon([x, y], hiddenPolygons[h])) return null;
+            for (let h = 0; h < hiddenCircles.length; h++) if (Math.hypot(x - hiddenCircles[h].x, y - hiddenCircles[h].y) <= hiddenCircles[h].r) return null;
+
+            for (let i = sections.length - 1; i >= 0; i--) {
+                let sec = sections[i];
+                for (let j = sec.subsections.length - 1; j >= 0; j--) {
+                    let sub = sec.subsections[j];
+                    if (checkShapeContains(x, y, dotKey, sub.polygons, sub.exclusions, sub.circles, sub.excludedCircles, sub.assignedDots, sub.excludedAssignedDots)) {
+                        let baseColor = colorMode === 'section' ? sec.color : sub.color;
+                        return styleFormat === 'mask_grey' ? hexToGreyscaleHex(baseColor) : baseColor;
+                    }
+                }
+                if (checkShapeContains(x, y, dotKey, sec.polygons, sec.exclusions, sec.circles, sec.excludedCircles, sec.assignedDots, sec.excludedAssignedDots)) {
+                    return styleFormat === 'mask_grey' ? hexToGreyscaleHex(sec.color) : sec.color;
+                }
+            }
+            return null;
+        }
+
+        function getDotBounds() {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let hasDots = false;
+            const spacing = parseFloat(spacingSlider.value);
+            const colorMode = getColorMode();
+            
+            for (let y = 0; y < canvas.height + spacing; y += spacing * 0.866) { 
+                let rowIsOdd = Math.round(y / (spacing * 0.866)) % 2 !== 0;
+                let xOffset = rowIsOdd ? spacing / 2 : 0;
+                for (let x = xOffset; x < canvas.width + spacing; x += spacing) {
+                    if (getDotColor(x, y, colorMode, 'color')) {
+                        hasDots = true;
+                        if (x < minX) minX = x; if (x > maxX) maxX = x;
+                        if (y < minY) minY = y; if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            
+            if (!hasDots) return null;
+            const pad = parseFloat(radiusSlider.value) + 10;
+            return {
+                minX: Math.max(0, minX - pad), minY: Math.max(0, minY - pad),
+                maxX: Math.min(canvas.width, maxX + pad), maxY: Math.min(canvas.height, maxY + pad)
+            };
+        }
+
+        // --- New Shape Rendering Helpers for Canvas ---
+        function drawHeart(ctx, x, y, r) {
+            let oy = y - r/2; // Center alignment offset
+            ctx.beginPath();
+            ctx.moveTo(x, oy + r/4);
+            ctx.bezierCurveTo(x, oy - r/2, x - r, oy - r/2, x - r, oy + r/4);
+            ctx.bezierCurveTo(x - r, oy + r, x, oy + r * 1.5, x, oy + r * 1.5);
+            ctx.bezierCurveTo(x, oy + r * 1.5, x + r, oy + r, x + r, oy + r/4);
+            ctx.bezierCurveTo(x + r, oy - r/2, x, oy - r/2, x, oy + r/4);
+            ctx.fill();
+        }
+
+        function drawStar(ctx, cx, cy, outerRadius) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / 5;
+            let innerRadius = outerRadius / 2;
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < 5; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function renderCanvasState(targetCtx, width, height, isExport = false, exportType = 'full', bounds = null) {
+            targetCtx.clearRect(0, 0, width, height);
+
+            if (exportType === 'full' || exportType === 'cropped' || !isExport) {
+                if (imgLoaded) {
+                    if (bounds) targetCtx.drawImage(img, bounds.minX, bounds.minY, width, height, 0, 0, width, height);
+                    else targetCtx.drawImage(img, 0, 0, width, height);
+                }
+                
+                if (overlayImgLoaded && document.getElementById('showOverlay').checked) {
+                    targetCtx.globalAlpha = parseFloat(document.getElementById('overlayOpacity').value);
+                    if (bounds) targetCtx.drawImage(overlayImg, bounds.minX, bounds.minY, width, height, 0, 0, width, height);
+                    else targetCtx.drawImage(overlayImg, 0, 0, width, height);
+                    targetCtx.globalAlpha = 1.0;
+                }
+            } else if (exportType.includes('_white')) {
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.fillRect(0, 0, width, height);
+            }
+
+            if (!isExport && currentPolygon.length > 0) {
+                targetCtx.beginPath();
+                targetCtx.moveTo(currentPolygon[0][0], currentPolygon[0][1]);
+                for (let i = 1; i < currentPolygon.length; i++) targetCtx.lineTo(currentPolygon[i][0], currentPolygon[i][1]);
+                
+                const mode = drawModeSelect.value, activeData = getActiveNodeData();
+                if (mode === 'hide') { targetCtx.strokeStyle = '#666'; targetCtx.setLineDash([5, 5]); } 
+                else if (mode === 'subtract') { targetCtx.strokeStyle = '#ff0000'; targetCtx.setLineDash([5, 5]); } 
+                else if (mode === 'add') { targetCtx.strokeStyle = activeData ? activeData.ref.color : '#007bff'; targetCtx.setLineDash([]); } 
+                else { targetCtx.strokeStyle = sectionColorInput.value; targetCtx.setLineDash([]); }
+                
+                targetCtx.lineWidth = 2; targetCtx.stroke(); targetCtx.setLineDash([]);
+                
+                if (toolTypeSelect.value === 'polygon') {
+                    currentPolygon.forEach((pt, i) => {
+                        targetCtx.beginPath(); targetCtx.arc(pt[0], pt[1], 4, 0, Math.PI * 2);
+                        targetCtx.fillStyle = i === 0 ? '#ffc107' : '#000'; targetCtx.fill();
+                        targetCtx.strokeStyle = '#fff'; targetCtx.lineWidth = 1; targetCtx.stroke();
+                    });
+                }
+            }
+
+            const spacing = parseFloat(spacingSlider.value);
+            const radius = parseFloat(radiusSlider.value);
+            const opacity = isExport && exportType !== 'full' && exportType !== 'cropped' ? 1.0 : parseFloat(opacitySlider.value);
+            const colorMode = getColorMode();
+            const shapeType = gridShapeSelect.value;
+            const isGrey = exportType.includes('grey');
+            const styleFormat = isGrey ? 'mask_grey' : 'color';
+
+            const iterW = bounds ? canvas.width : width;
+            const iterH = bounds ? canvas.height : height;
+
+            for (let y = 0; y < iterH + spacing; y += spacing * 0.866) { 
+                let rowIsOdd = Math.round(y / (spacing * 0.866)) % 2 !== 0;
+                let xOffset = rowIsOdd ? spacing / 2 : 0;
+                for (let x = xOffset; x < iterW + spacing; x += spacing) {
+                    
+                    if (bounds && (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY)) continue;
+
+                    let dotColor = getDotColor(x, y, colorMode, styleFormat);
+                    if (dotColor) {
+                        let drawX = bounds ? x - bounds.minX : x;
+                        let drawY = bounds ? y - bounds.minY : y;
+                        
+                        targetCtx.fillStyle = hexToRgba(dotColor, opacity); 
+                        if (shapeType === 'dot') {
+                            targetCtx.beginPath(); 
+                            targetCtx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                            targetCtx.fill();
+                        } else if (shapeType === 'heart') {
+                            drawHeart(targetCtx, drawX, drawY, radius);
+                        } else if (shapeType === 'star') {
+                            drawStar(targetCtx, drawX, drawY, radius);
+                        }
+                    }
+                }
+            }
+        }
+
+        function draw() { renderCanvasState(ctx, canvas.width, canvas.height, false); }
+
+        document.getElementById('exportPngBtn').addEventListener('click', () => {
+            if (!imgLoaded && !overlayImgLoaded && sections.length === 0) return alert("Nothing to export.");
+            const exportType = document.getElementById('exportType').value;
+            let bounds = null;
+            let w = canvas.width, h = canvas.height;
+
+            if (exportType === 'cropped') {
+                bounds = getDotBounds();
+                if (!bounds) return alert("No dots to crop around!");
+                w = bounds.maxX - bounds.minX;
+                h = bounds.maxY - bounds.minY;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = w; tempCanvas.height = h;
+            renderCanvasState(tempCanvas.getContext('2d'), w, h, true, exportType, bounds);
+            const link = document.createElement('a'); link.download = `spatial_plot_${exportType}.png`;
+            link.href = tempCanvas.toDataURL('image/png'); link.click();
+        });
+
+        // --- New SVG Shape Builders ---
+        function getHeartSvg(x, y, r, color, opacity) {
+            let oy = y - r/2; 
+            let d = `M ${x} ${oy + r/4} C ${x} ${oy - r/2}, ${x - r} ${oy - r/2}, ${x - r} ${oy + r/4} C ${x - r} ${oy + r}, ${x} ${oy + r * 1.5}, ${x} ${oy + r * 1.5} C ${x} ${oy + r * 1.5}, ${x + r} ${oy + r}, ${x + r} ${oy + r/4} C ${x + r} ${oy - r/2}, ${x} ${oy - r/2}, ${x} ${oy + r/4} Z`;
+            return `<path d="${d}" fill="${color}" opacity="${opacity}" />`;
+        }
+
+        function getStarSvg(cx, cy, r, color, opacity) {
+            let rot = Math.PI / 2 * 3;
+            let step = Math.PI / 5;
+            let innerRadius = r / 2;
+            let pts = [];
+            for (let i = 0; i < 5; i++) {
+                pts.push(`${cx + Math.cos(rot) * r},${cy + Math.sin(rot) * r}`);
+                rot += step;
+                pts.push(`${cx + Math.cos(rot) * innerRadius},${cy + Math.sin(rot) * innerRadius}`);
+                rot += step;
+            }
+            return `<polygon points="${pts.join(' ')}" fill="${color}" opacity="${opacity}" />`;
+        }
+
+        document.getElementById('exportSvgBtn').addEventListener('click', () => {
+             if (!imgLoaded && !overlayImgLoaded && sections.length === 0) return alert("Nothing to export.");
+             const exportType = document.getElementById('exportType').value;
+             const colorMode = getColorMode();
+             const shapeType = gridShapeSelect.value;
+             const spacing = parseFloat(spacingSlider.value);
+             const radius = parseFloat(radiusSlider.value);
+             const opacity = (exportType !== 'full' && exportType !== 'cropped') ? 1.0 : parseFloat(opacitySlider.value);
+             
+             let bounds = null;
+             let w = canvas.width, h = canvas.height;
+             
+             if (exportType === 'cropped') {
+                 bounds = getDotBounds();
+                 if (!bounds) return alert("No dots to crop around!");
+                 w = bounds.maxX - bounds.minX;
+                 h = bounds.maxY - bounds.minY;
+             }
+
+             let vBox = `0 0 ${w} ${h}`;
+             let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vBox}">`;
+             
+             if (exportType === 'full' || exportType === 'cropped') {
+                 let imgX = bounds ? -bounds.minX : 0;
+                 let imgY = bounds ? -bounds.minY : 0;
+                 
+                 if (imgLoaded) {
+                     svgContent += `<image href="${originalImgDataUrl}" x="${imgX}" y="${imgY}" width="${canvas.width}" height="${canvas.height}" />`;
+                 }
+                 if (overlayImgLoaded && document.getElementById('showOverlay').checked) {
+                     let overOpacity = document.getElementById('overlayOpacity').value;
+                     svgContent += `<image href="${overlayImgDataUrl}" x="${imgX}" y="${imgY}" width="${canvas.width}" height="${canvas.height}" opacity="${overOpacity}" />`;
+                 }
+             } else if (exportType.includes('_white')) {
+                 svgContent += `<rect width="${w}" height="${h}" fill="#ffffff" />`;
+             }
+             
+             const isGrey = exportType.includes('grey');
+             const styleFormat = isGrey ? 'mask_grey' : 'color';
+
+             for (let y = 0; y < canvas.height + spacing; y += spacing * 0.866) {
+                let rowIsOdd = Math.round(y / (spacing * 0.866)) % 2 !== 0;
+                let xOffset = rowIsOdd ? spacing / 2 : 0;
+                for (let x = xOffset; x < canvas.width + spacing; x += spacing) {
+                    
+                    if (bounds && (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY)) continue;
+
+                    let dotColor = getDotColor(x, y, colorMode, styleFormat);
+                    if (dotColor) {
+                        let drawX = bounds ? x - bounds.minX : x;
+                        let drawY = bounds ? y - bounds.minY : y;
+                        
+                        if (shapeType === 'dot') {
+                            svgContent += `<circle cx="${drawX}" cy="${drawY}" r="${radius}" fill="${dotColor}" opacity="${opacity}" />`;
+                        } else if (shapeType === 'heart') {
+                            svgContent += getHeartSvg(drawX, drawY, radius, dotColor, opacity);
+                        } else if (shapeType === 'star') {
+                            svgContent += getStarSvg(drawX, drawY, radius, dotColor, opacity);
+                        }
+                    }
+                }
+            }
+            svgContent += `</svg>`;
+            
+            const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a'); link.download = `spatial_plot_${exportType}.svg`;
+            link.href = url; link.click();
+        });
+        
+        sectionColorInput.value = getRandomColor();
+    </script>
+</body>
+</html>
