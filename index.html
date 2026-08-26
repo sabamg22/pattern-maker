@@ -24,6 +24,7 @@
             height: 100vh; 
             background: var(--desktop-bg); 
             color: #000;
+            overflow: hidden; /* Prevents outer body scrollbars */
         }
 
         #sidebar { 
@@ -60,15 +61,34 @@
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            overflow: auto; 
+            overflow: auto; /* Adds scrollbars inside the frame if zoomed/large */
             padding: 20px; 
+            position: relative;
+        }
+
+        /* The Framing Window Container */
+        .canvas-frame {
+            background: #ffffff;
+            border: 2px solid;
+            border-color: var(--win-border-dark) var(--win-border-white) var(--win-border-white) var(--win-border-dark);
+            box-shadow: inset 1px 1px var(--win-border-black), 2px 2px 8px rgba(0,0,0,0.4);
+            padding: 4px;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
         }
 
         canvas { 
             background: #fff; 
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.5); 
             cursor: crosshair; 
-        }
+            /* Snaps the visual display size to fit the frame while preserving aspect ratio */
+            max-width: 100%;
+            max-height: calc(100vh - 80px);
+            object-fit: contain;
+            display: block;
 
         fieldset {
             border: 2px solid;
@@ -270,7 +290,9 @@
     </div>
 
     <div id="main">
-        <canvas id="canvas"></canvas>
+        <div class="canvas-frame">
+            <canvas id="canvas"></canvas>
+        </div>
     </div>
 
     <script>
@@ -372,8 +394,12 @@
             const reader = new FileReader();
             reader.onload = function(event) {
                 img.onload = function() {
-                    canvas.width = img.width; canvas.height = img.height; imgLoaded = true;
-                    originalImgDataUrl = event.target.result; draw();
+                    // Set internal resolution to match actual image dimensions for precise analysis
+                    canvas.width = img.width; 
+                    canvas.height = img.height; 
+                    imgLoaded = true;
+                    originalImgDataUrl = event.target.result; 
+                    draw();
                 }
                 img.src = event.target.result;
             }
@@ -717,9 +743,8 @@
             };
         }
 
-        // --- New Shape Rendering Helpers for Canvas ---
         function drawHeart(ctx, x, y, r) {
-            let oy = y - r/2; // Center alignment offset
+            let oy = y - r/2; 
             ctx.beginPath();
             ctx.moveTo(x, oy + r/4);
             ctx.bezierCurveTo(x, oy - r/2, x - r, oy - r/2, x - r, oy + r/4);
@@ -856,7 +881,6 @@
             link.href = tempCanvas.toDataURL('image/png'); link.click();
         });
 
-        // --- New SVG Shape Builders ---
         function getHeartSvg(x, y, r, color, opacity) {
             let oy = y - r/2; 
             let d = `M ${x} ${oy + r/4} C ${x} ${oy - r/2}, ${x - r} ${oy - r/2}, ${x - r} ${oy + r/4} C ${x - r} ${oy + r}, ${x} ${oy + r * 1.5}, ${x} ${oy + r * 1.5} C ${x} ${oy + r * 1.5}, ${x + r} ${oy + r}, ${x + r} ${oy + r/4} C ${x + r} ${oy - r/2}, ${x} ${oy - r/2}, ${x} ${oy + r/4} Z`;
@@ -938,16 +962,40 @@
                         }
                     }
                 }
-            }
-            svgContent += `</svg>`;
-            
-            const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a'); link.download = `spatial_plot_${exportType}.svg`;
-            link.href = url; link.click();
+             }
+             svgContent += `</svg>`;
+             
+             const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
+             const url = URL.createObjectURL(blob);
+             const link = document.createElement('a'); link.download = `spatial_plot_${exportType}.svg`;
+             link.href = url; link.click();
         });
         
         sectionColorInput.value = getRandomColor();
+
+        const defaultCanvas = document.createElement('canvas');
+        defaultCanvas.width = 1200; defaultCanvas.height = 900; // Simulated large high-res image
+        const dCtx = defaultCanvas.getContext('2d');
+        const grad = dCtx.createLinearGradient(0, 0, 1200, 900);
+        grad.addColorStop(0, '#f8f9fa'); grad.addColorStop(1, '#e9ecef');
+        dCtx.fillStyle = grad; dCtx.fillRect(0, 0, 1200, 900);
+        dCtx.fillStyle = '#6c757d'; dCtx.font = '28px sans-serif'; dCtx.textAlign = 'center';
+        dCtx.fillText('Default Framed High-Res Image Loaded', 600, 450);
+        
+        const defaultDataUrl = defaultCanvas.toDataURL('image/png');
+
+        img.onload = function() {
+            canvas.width = img.width; 
+            canvas.height = img.height; 
+            imgLoaded = true;
+            originalImgDataUrl = defaultDataUrl; 
+            
+            if (sections.length === 0) {
+                createNewSectionNode();
+            }
+            draw();
+        };
+        img.src = 'brain.jpg';
     </script>
 </body>
 </html>
